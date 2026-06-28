@@ -1,0 +1,57 @@
+# Binaries and build output
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/bin/
+/dist/
+/build/
+
+# Go test and coverage artifacts
+*.test
+*.out
+coverage.txt
+coverage.html
+*.coverprofile
+
+# Go workspace (local multi-module setups)
+go.work
+go.work.sum
+
+# Dependency vendoring (uncomment if you vendor deps)
+# vendor/
+
+# Environment and secrets — never commit tokens or local overrides
+.env
+.env.*
+!.env.example
+
+# IDE and editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Live-reload tools (e.g. air)
+tmp/
+
+# Debug and profiling
+*.prof
+*.pprof
+debug
+debug.test
