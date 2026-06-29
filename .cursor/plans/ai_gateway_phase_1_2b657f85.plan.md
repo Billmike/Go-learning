@@ -7,16 +7,16 @@ todos:
     status: completed
   - id: m1-http
     content: "Milestone 1: HTTP server, pkg/response, /health and /version handlers"
-    status: pending
+    status: completed
   - id: m2-logging
     content: "Milestone 2: slog JSON logging setup in internal/logging"
-    status: pending
+    status: completed
   - id: m3-requestid
     content: "Milestone 3: Request ID middleware with context propagation"
-    status: pending
+    status: completed
   - id: m4-5-middleware
     content: "Milestones 4-5: Logging middleware, status capture, middleware chain builder"
-    status: pending
+    status: completed
   - id: m6-7-safety
     content: "Milestones 6-7: Panic recovery and request timeout middleware"
     status: pending
