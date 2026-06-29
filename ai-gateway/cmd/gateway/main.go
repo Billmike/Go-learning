@@ -7,6 +7,7 @@ import (
 
 	"github.com/kayodeayelegun/ai-gateway/internal/config"
 	"github.com/kayodeayelegun/ai-gateway/internal/handlers"
+	"github.com/kayodeayelegun/ai-gateway/internal/requestid"
 )
 
 func main() {
@@ -19,10 +20,12 @@ func main() {
 	mux.HandleFunc("GET /health", handlers.Health)
 	mux.HandleFunc("GET /version", handlers.Version)
 
+	handler := requestid.Middleware(mux)
+
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("gateway listening on %s", addr)
 
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if err := http.ListenAndServe(addr, handler); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }
