@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/kayodeayelegun/ai-gateway/internal/config"
+	"github.com/kayodeayelegun/ai-gateway/internal/handlers"
 )
 
 func main() {
@@ -12,6 +15,14 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	log.Printf("gateway config loaded (port=%s, timeout=%s, rate_limit=%d)",
-		cfg.Port, cfg.RequestTimeout, cfg.RateLimit)
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", handlers.Health)
+	mux.HandleFunc("GET /version", handlers.Version)
+
+	addr := fmt.Sprintf(":%s", cfg.Port)
+	log.Printf("gateway listening on %s", addr)
+
+	if err := http.ListenAndServe(addr, mux); err != nil {
+		log.Fatalf("server error: %v", err)
+	}
 }
