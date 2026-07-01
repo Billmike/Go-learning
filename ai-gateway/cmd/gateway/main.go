@@ -1,17 +1,16 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/kayodeayelegun/ai-gateway/internal/config"
-	"github.com/kayodeayelegun/ai-gateway/internal/handlers"
+	"github.com/kayodeayelegun/ai-gateway/internal/gateway"
 	"github.com/kayodeayelegun/ai-gateway/internal/logging"
-	"github.com/kayodeayelegun/ai-gateway/internal/middleware"
-	"github.com/kayodeayelegun/ai-gateway/internal/ratelimit"
-	"github.com/kayodeayelegun/ai-gateway/internal/requestid"
-	"github.com/kayodeayelegun/ai-gateway/internal/router"
 )
 
 func main() {
@@ -22,32 +21,38 @@ func main() {
 
 	logger := logging.New(cfg.LogLevel)
 
-	rt, err := router.New(cfg, logger)
+	srv, err := gateway.New(cfg, logger)
 	if err != nil {
-		log.Fatalf("failed to create router: %v", err)
+		log.Fatalf("failed to create gateway: %v", err)
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", handlers.Health)
-	mux.HandleFunc("GET /version", handlers.Version)
-	rt.Register(mux)
+	logger.Info("gateway listening", "addr", srv.HTTP.Addr)
 
-	limiter := ratelimit.New(cfg.RateLimit)
+	errCh := make(chan error, 1)
+	go func() {
+		if err := srv.HTTP.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- err
+		}
+	}()
 
-	handler := middleware.Chain(
-		middleware.Recovery(logger),
-		requestid.Middleware,
-		middleware.Logging(logger),
-		middleware.Timeout(cfg.RequestTimeout),
-		middleware.Auth(cfg.APIToken),
-		middleware.RateLimit(limiter),
-	)(mux)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-	addr := fmt.Sprintf(":%s", cfg.Port)
-	logger.Info("gateway listening", "addr", addr)
-
-	if err := http.ListenAndServe(addr, handler); err != nil {
+	select {
+	case err := <-errCh:
 		logger.Error("server error", "error", err)
 		log.Fatalf("server error: %v", err)
+	case sig := <-quit:
+		logger.Info("shutdown signal received", "signal", sig.String())
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), gateway.ShutdownTimeout)
+	defer cancel()
+
+	if err := srv.HTTP.Shutdown(ctx); err != nil {
+		logger.Error("shutdown error", "error", err)
+		log.Fatalf("shutdown error: %v", err)
+	}
+
+	logger.Info("server stopped")
 }

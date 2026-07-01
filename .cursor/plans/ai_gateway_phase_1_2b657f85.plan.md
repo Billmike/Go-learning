@@ -31,7 +31,7 @@ todos:
     status: completed
   - id: m12-14-server
     content: "Milestones 12-14: Metrics, gateway wiring, graceful shutdown"
-    status: pending
+    status: completed
   - id: m15-mocks
     content: "Milestone 15: cmd/mock-model-a and cmd/mock-model-b dev servers"
     status: pending
