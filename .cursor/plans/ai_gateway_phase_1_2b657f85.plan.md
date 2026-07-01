@@ -28,7 +28,7 @@ todos:
     status: completed
   - id: m10-11-proxy
     content: "Milestones 10-11: Reverse proxy wrapper and path router"
-    status: pending
+    status: completed
   - id: m12-14-server
     content: "Milestones 12-14: Metrics, gateway wiring, graceful shutdown"
     status: pending
