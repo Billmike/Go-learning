@@ -17,9 +17,12 @@ todos:
   - id: m4-5-middleware
     content: "Milestones 4-5: Logging middleware, status capture, middleware chain builder"
     status: completed
-  - id: m6-7-safety
-    content: "Milestones 6-7: Panic recovery and request timeout middleware"
-    status: pending
+  - id: m6-recovery
+    content: "Milestone 6: Panic recovery middleware"
+    status: completed
+  - id: m7-timeout
+    content: "Milestone 7: Request timeout middleware"
+    status: completed
   - id: m8-9-security
     content: "Milestones 8-9: Bearer auth and in-memory rate limiter"
     status: pending

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/kayodeayelegun/ai-gateway/internal/middleware"
 	"github.com/kayodeayelegun/ai-gateway/internal/requestid"
@@ -93,6 +94,129 @@ func TestLogging_middlewareCapturesStatusAndRequestID(t *testing.T) {
 	}
 	if _, ok := entry["latency_ms"]; !ok {
 		t.Fatal("expected latency_ms in log")
+	}
+}
+
+func TestRecovery_returns500OnPanic(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	handler := middleware.Chain(
+		middleware.Recovery(logger),
+		requestid.Middleware,
+	)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		panic("something went wrong")
+	}))
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/panic", nil))
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal body: %v", err)
+	}
+	if body["error"] != "internal server error" {
+		t.Fatalf("error = %q, want %q", body["error"], "internal server error")
+	}
+
+	if !bytes.Contains(buf.Bytes(), []byte("panic recovered")) {
+		t.Fatalf("expected panic log, got: %s", buf.String())
+	}
+}
+
+func TestRecovery_allowsNormalRequests(t *testing.T) {
+	t.Parallel()
+
+	logger := slog.New(slog.NewJSONHandler(&bytes.Buffer{}, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	handler := middleware.Recovery(logger)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestTimeout_returns504WhenHandlerExceedsDeadline(t *testing.T) {
+	t.Parallel()
+
+	handler := middleware.Timeout(10 * time.Millisecond)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(50 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/slow", nil))
+
+	if rec.Code != http.StatusGatewayTimeout {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusGatewayTimeout)
+	}
+
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal body: %v", err)
+	}
+	if body["error"] != "gateway timeout" {
+		t.Fatalf("error = %q, want %q", body["error"], "gateway timeout")
+	}
+}
+
+func TestTimeout_allowsFastHandlers(t *testing.T) {
+	t.Parallel()
+
+	handler := middleware.Timeout(time.Second)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestTimeout_propagatesContextToHandler(t *testing.T) {
+	t.Parallel()
+
+	handler := middleware.Timeout(10 * time.Millisecond)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/ctx", nil))
+
+	if rec.Code != http.StatusGatewayTimeout {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusGatewayTimeout)
+	}
+}
+
+func TestTimeout_contextCarriesDeadline(t *testing.T) {
+	t.Parallel()
+
+	var gotDeadline bool
+	handler := middleware.Timeout(10 * time.Millisecond)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		_, gotDeadline = r.Context().Deadline()
+	}))
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	if !gotDeadline {
+		t.Fatal("expected request context to carry a deadline")
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }
 

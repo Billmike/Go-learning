@@ -25,8 +25,10 @@ func main() {
 	mux.HandleFunc("GET /version", handlers.Version)
 
 	handler := middleware.Chain(
+		middleware.Recovery(logger),
 		requestid.Middleware,
 		middleware.Logging(logger),
+		middleware.Timeout(cfg.RequestTimeout),
 	)(mux)
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
