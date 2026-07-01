@@ -34,7 +34,7 @@ todos:
     status: completed
   - id: m15-mocks
     content: "Milestone 15: cmd/mock-model-a and cmd/mock-model-b dev servers"
-    status: pending
+    status: completed
   - id: m16-17-tests
     content: "Milestones 16-17: Unit/integration tests, benchmarks, README"
     status: pending
