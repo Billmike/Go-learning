@@ -220,6 +220,121 @@ func TestTimeout_contextCarriesDeadline(t *testing.T) {
 	}
 }
 
+func TestAuth_returns401WhenTokenMissing(t *testing.T) {
+	t.Parallel()
+
+	handler := middleware.Auth("secret-token")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/health", nil))
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal body: %v", err)
+	}
+	if body["error"] != "missing authorization token" {
+		t.Fatalf("error = %q, want %q", body["error"], "missing authorization token")
+	}
+}
+
+func TestAuth_returns401WhenTokenInvalid(t *testing.T) {
+	t.Parallel()
+
+	handler := middleware.Auth("secret-token")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set("Authorization", "Bearer wrong-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal body: %v", err)
+	}
+	if body["error"] != "invalid authorization token" {
+		t.Fatalf("error = %q, want %q", body["error"], "invalid authorization token")
+	}
+}
+
+func TestAuth_allowsValidToken(t *testing.T) {
+	t.Parallel()
+
+	handler := middleware.Auth("secret-token")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set("Authorization", "Bearer secret-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+type stubLimiter struct {
+	allowed bool
+}
+
+func (s stubLimiter) Allow(string) bool {
+	return s.allowed
+}
+
+func TestRateLimit_returns429WhenExceeded(t *testing.T) {
+	t.Parallel()
+
+	handler := middleware.RateLimit(stubLimiter{allowed: false})(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set("Authorization", "Bearer secret-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusTooManyRequests)
+	}
+
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal body: %v", err)
+	}
+	if body["error"] != "rate limit exceeded" {
+		t.Fatalf("error = %q, want %q", body["error"], "rate limit exceeded")
+	}
+}
+
+func TestRateLimit_allowsWhenUnderLimit(t *testing.T) {
+	t.Parallel()
+
+	handler := middleware.RateLimit(stubLimiter{allowed: true})(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set("Authorization", "Bearer secret-token")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
 func TestLogging_defaultsStatusTo200WhenWriteOnly(t *testing.T) {
 	t.Parallel()
 

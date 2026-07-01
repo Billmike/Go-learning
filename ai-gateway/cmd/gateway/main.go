@@ -9,6 +9,7 @@ import (
 	"github.com/kayodeayelegun/ai-gateway/internal/handlers"
 	"github.com/kayodeayelegun/ai-gateway/internal/logging"
 	"github.com/kayodeayelegun/ai-gateway/internal/middleware"
+	"github.com/kayodeayelegun/ai-gateway/internal/ratelimit"
 	"github.com/kayodeayelegun/ai-gateway/internal/requestid"
 )
 
@@ -24,11 +25,15 @@ func main() {
 	mux.HandleFunc("GET /health", handlers.Health)
 	mux.HandleFunc("GET /version", handlers.Version)
 
+	limiter := ratelimit.New(cfg.RateLimit)
+
 	handler := middleware.Chain(
 		middleware.Recovery(logger),
 		requestid.Middleware,
 		middleware.Logging(logger),
 		middleware.Timeout(cfg.RequestTimeout),
+		middleware.Auth(cfg.APIToken),
+		middleware.RateLimit(limiter),
 	)(mux)
 
 	addr := fmt.Sprintf(":%s", cfg.Port)

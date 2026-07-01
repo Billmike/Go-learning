@@ -25,7 +25,7 @@ todos:
     status: completed
   - id: m8-9-security
     content: "Milestones 8-9: Bearer auth and in-memory rate limiter"
-    status: pending
+    status: completed
   - id: m10-11-proxy
     content: "Milestones 10-11: Reverse proxy wrapper and path router"
     status: pending
